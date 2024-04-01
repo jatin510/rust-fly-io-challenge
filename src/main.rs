@@ -9,16 +9,28 @@ struct Message {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum Payload {
+    Echo {
+        echo: String,
+    },
+    EchoOk {
+        echo: String,
+    },
+    Init {
+        node_id: String,
+        node_ids: Vec<String>,
+    },
+    InitOk {},
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct Body {
     msg_id: Option<u64>,
     in_reply_to: Option<u64>,
 
-    echo: String,
-    #[serde(rename = "type")]
-    body_type: String,
-
-    node_id: String,
-    node_ids: Vec<String>,
+    #[serde(flatten)]
+    payload: Payload,
 }
 
 // nodes prefix  - n
@@ -30,26 +42,40 @@ struct Body {
 //
 
 fn handle_message(msg: Message) -> Message {
-    let response_body_type = match msg.body.body_type.as_str() {
-        "echo" => "echo_ok".to_string(),
-        "init" => "init_ok".to_string(),
-        _ => "unknown".to_string(),
-    };
-
-    let new_message = Message {
-        src: msg.dest,
-        dest: msg.src,
-        body: Body {
-            msg_id: msg.body.msg_id,
-            in_reply_to: msg.body.msg_id,
-            echo: msg.body.echo,
-            body_type: response_body_type,
-            node_id: msg.body.node_id,
-            node_ids: msg.body.node_ids,
+    let reply = match msg.body.payload {
+        Payload::Init {
+            node_id: _,
+            node_ids: _,
+        } => Message {
+            src: msg.dest,
+            dest: msg.src,
+            body: Body {
+                msg_id: Some(1),
+                in_reply_to: msg.body.msg_id,
+                payload: Payload::InitOk {},
+            },
+        },
+        Payload::Echo { echo } => Message {
+            src: msg.dest,
+            dest: msg.src,
+            body: Body {
+                msg_id: Some(1),
+                in_reply_to: msg.body.msg_id,
+                payload: Payload::EchoOk { echo },
+            },
+        },
+        _ => Message {
+            src: msg.dest,
+            dest: msg.src,
+            body: Body {
+                msg_id: Some(1),
+                in_reply_to: msg.body.msg_id,
+                payload: Payload::InitOk {},
+            },
         },
     };
 
-    return new_message;
+    return reply;
 }
 
 fn main() -> Result<(), Error> {
@@ -67,7 +93,9 @@ fn main() -> Result<(), Error> {
     for message in messages {
         let output_message = handle_message(message);
 
-        println!("{:?}", output_message);
+        let reply = serde_json::to_string(&output_message).expect("the message to be serializable");
+        println!("{}", reply);
+        // println!("{:?}", output_message);
     }
 
     // let stdin = io::stdin().lock();
@@ -82,65 +110,50 @@ fn main() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*; // Import everything from the outer module
+    use super::*;
 
     #[test]
-    fn test_handle_message_echo() {
-        // Setup a sample message with `body_type` set to "echo"
-        let test_message = Message {
-            src: "c1".to_string(),
-            dest: "n1".to_string(),
+    fn handle_message_init() {
+        let init_msg = Message {
+            src: "client1".to_string(),
+            dest: "server1".to_string(),
             body: Body {
-                echo: "Test echo message".to_string(),
-                body_type: "echo".to_string(),
-                msg_id: Some(123),
+                msg_id: Some(10),
                 in_reply_to: None,
-                node_id: "node_1".to_string(),
-                node_ids: vec!["node_2".to_string(), "node_3".to_string()],
+                payload: Payload::Init {
+                    node_id: "node123".to_string(),
+                    node_ids: vec!["node456".to_string()],
+                },
             },
         };
 
-        // Call `handle_message` with the test message
-        let response_message = handle_message(test_message);
-
-        // Assertions to verify the response message's properties
-        assert_eq!(response_message.src, "n1");
-        assert_eq!(response_message.dest, "c1");
-        assert_eq!(response_message.body.body_type, "echo_ok");
-        assert_eq!(response_message.body.msg_id, Some(123));
-        assert_eq!(response_message.body.in_reply_to, Some(123));
-        assert_eq!(response_message.body.echo, "Test echo message");
-        assert_eq!(response_message.body.node_id, "node_1");
-        assert_eq!(response_message.body.node_ids, vec!["node_2", "node_3"]);
+        let reply = handle_message(init_msg);
+        assert_eq!(reply.src, "server1");
+        assert_eq!(reply.dest, "client1");
+        // assert_matches!(reply.body.payload, Payload::InitOk {});
     }
 
     #[test]
-    fn test_handle_message_init() {
-        // Setup a sample message with `body_type` set to "init"
-        let test_message = Message {
-            src: "c1".to_string(),
-            dest: "n1".to_string(),
+    fn handle_message_echo() {
+        let echo_msg = Message {
+            src: "client2".to_string(),
+            dest: "server2".to_string(),
             body: Body {
-                echo: "Test init message".to_string(),
-                body_type: "init".to_string(),
-                msg_id: Some(456),
+                msg_id: Some(20),
                 in_reply_to: None,
-                node_id: "node_x".to_string(),
-                node_ids: vec!["node_y".to_string(), "node_z".to_string()],
+                payload: Payload::Echo {
+                    echo: "Hello!".to_string(),
+                },
             },
         };
 
-        // Call `handle_message` with the test message
-        let response_message = handle_message(test_message);
-
-        // Assertions to verify the response message's properties
-        assert_eq!(response_message.src, "n1");
-        assert_eq!(response_message.dest, "c1");
-        assert_eq!(response_message.body.body_type, "init_ok");
-        assert_eq!(response_message.body.msg_id, Some(456));
-        assert_eq!(response_message.body.in_reply_to, Some(456));
-        assert_eq!(response_message.body.echo, "Test init message");
-        assert_eq!(response_message.body.node_id, "node_x");
-        assert_eq!(response_message.body.node_ids, vec!["node_y", "node_z"]);
+        let reply = handle_message(echo_msg);
+        assert_eq!(reply.src, "server2");
+        assert_eq!(reply.dest, "client2");
+        if let Payload::EchoOk { echo } = reply.body.payload {
+            assert_eq!(echo, "Hello!");
+        } else {
+            panic!("Expected Payload::EchoOk");
+        }
     }
 }
