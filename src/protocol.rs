@@ -1,13 +1,15 @@
+use serde::{self, Deserialize, Serialize};
+
 #[derive(Debug, Serialize, Deserialize)]
-struct Message {
-    src: String,
-    dest: String,
-    body: Body,
+pub struct Message {
+    pub src: String,
+    pub dest: String,
+    pub body: Body,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum Payload {
+pub enum Payload {
     Echo {
         echo: String,
     },
@@ -22,12 +24,12 @@ enum Payload {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Body {
-    msg_id: Option<u64>,
-    in_reply_to: Option<u64>,
+pub struct Body {
+    pub msg_id: Option<u64>,
+    pub in_reply_to: Option<u64>,
 
     #[serde(flatten)]
-    payload: Payload,
+    pub payload: Payload,
 }
 
 // nodes prefix  - n
