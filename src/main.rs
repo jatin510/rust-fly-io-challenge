@@ -1,5 +1,6 @@
 use std::io::{self, Error};
 
+use rand::Rng;
 use std::io::BufRead;
 
 mod protocol;
@@ -29,6 +30,20 @@ fn handle_message(msg: Message) -> Message {
                 payload: Payload::EchoOk { echo },
             },
         },
+        Payload::Generate {} => {
+            let mut rng = rand::thread_rng();
+            let random_id: u64 = rng.gen();
+
+            return Message {
+                src: msg.dest,
+                dest: msg.src,
+                body: Body {
+                    msg_id: Some(1),
+                    in_reply_to: msg.body.msg_id,
+                    payload: Payload::GenerateOk { id: random_id },
+                },
+            };
+        }
         _ => Message {
             src: msg.dest,
             dest: msg.src,
@@ -56,7 +71,6 @@ fn main() -> Result<(), Error> {
     // // println!("input {:?}", input);
     // // Deserialize the input string into a Vec<Message>
     // let messages: Vec<Message> = serde_json::from_str(&input.trim())?;
-    // //
 
     // for message in messages {
     //     let output_message = handle_message(message);
@@ -72,8 +86,6 @@ fn main() -> Result<(), Error> {
 
     // Print the deserialized Vec<Message> for verification
     // println!("Deserialized messages: {:?}", messages);
-    //
-    //
 
     let stdin = io::stdin();
     let reader = stdin.lock();

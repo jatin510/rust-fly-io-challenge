@@ -21,6 +21,10 @@ pub enum Payload {
         node_ids: Vec<String>,
     },
     InitOk {},
+    Generate {},
+    GenerateOk {
+        id: u64,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
