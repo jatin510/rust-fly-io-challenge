@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{self, Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,6 +27,18 @@ pub enum Payload {
     GenerateOk {
         id: u64,
     },
+    Broadcast {
+        message: u64,
+    },
+    BroadcastOk {},
+    Read {},
+    ReadOk {
+        messages: Vec<u64>,
+    },
+    Topology {
+        topology: HashMap<String, Vec<String>>,
+    },
+    TopologyOk {},
 }
 
 #[derive(Debug, Serialize, Deserialize)]

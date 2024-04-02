@@ -1,3 +1,7 @@
+#[macro_use]
+extern crate lazy_static;
+use std::sync::Mutex;
+
 use std::io::{self, Error};
 
 use rand::Rng;
@@ -6,6 +10,31 @@ use std::io::BufRead;
 mod protocol;
 use protocol::*;
 // use protocol::{Body, Message, Payload};
+//
+
+lazy_static! {
+    static ref GLOBAL_MESSAGE_IDS: Mutex<MessageIds> = Mutex::new(MessageIds::new());
+}
+
+struct MessageIds {
+    ids: Vec<u64>,
+}
+
+impl MessageIds {
+    // Constructor method to create a new MessageIds instance
+    fn new() -> Self {
+        MessageIds { ids: Vec::new() }
+    }
+
+    // Method to add a message ID to the vector
+    fn add_message_id(&mut self, id: u64) {
+        self.ids.push(id);
+    }
+
+    fn get_message_ids(&self) -> Vec<u64> {
+        self.ids.clone()
+    }
+}
 
 fn handle_message(msg: Message) -> Message {
     let reply = match msg.body.payload {
@@ -43,6 +72,49 @@ fn handle_message(msg: Message) -> Message {
                     payload: Payload::GenerateOk { id: random_id },
                 },
             };
+        }
+        Payload::Broadcast {
+            message: message_id,
+        } => {
+            let mut ids = GLOBAL_MESSAGE_IDS.lock().unwrap();
+            ids.add_message_id(message_id);
+
+            return Message {
+                src: msg.dest,
+                dest: msg.src,
+                body: Body {
+                    msg_id: Some(1),
+                    in_reply_to: msg.body.msg_id,
+                    payload: Payload::BroadcastOk {},
+                },
+            };
+        }
+        Payload::Read {} => {
+            let ids = GLOBAL_MESSAGE_IDS.lock().unwrap();
+            let message_ids = ids.get_message_ids();
+
+            return Message {
+                src: msg.dest,
+                dest: msg.src,
+                body: Body {
+                    msg_id: Some(1),
+                    in_reply_to: msg.body.msg_id,
+                    payload: Payload::ReadOk {
+                        messages: message_ids,
+                    },
+                },
+            };
+        }
+        Payload::Topology { topology } => {
+            return Message {
+                src: msg.dest,
+                dest: msg.src,
+                body: Body {
+                    msg_id: Some(1),
+                    in_reply_to: msg.body.msg_id,
+                    payload: Payload::TopologyOk {},
+                },
+            }
         }
         _ => Message {
             src: msg.dest,
