@@ -5,7 +5,6 @@ use std::io::BufRead;
 
 mod protocol;
 use protocol::*;
-// use protocol::{Body, Message, Payload};
 
 fn handle_message(msg: Message) -> Message {
     let reply = match msg.body.payload {
@@ -59,34 +58,6 @@ fn handle_message(msg: Message) -> Message {
 }
 
 fn main() -> Result<(), Error> {
-    // let stdin = io::stdin(); // Get the standard input handle
-    // let mut handle = stdin.lock(); // Lock stdin for efficient reading
-
-    // println!("hello world ");
-
-    // let mut input = String::new();
-    // handle.read_to_string(&mut input)?; // Read all data into input
-
-    // println!("hello world {}", input);
-    // // println!("input {:?}", input);
-    // // Deserialize the input string into a Vec<Message>
-    // let messages: Vec<Message> = serde_json::from_str(&input.trim())?;
-
-    // for message in messages {
-    //     let output_message = handle_message(message);
-
-    //     let reply = serde_json::to_string(&output_message).expect("the message to be serializable");
-    //     println!("{}", reply);
-    //     // println!("{:?}", output_message);
-    // }
-
-    // let stdin = io::stdin().lock();
-    // let messages = serde_json::Deserializer::from_reader(stdin).into_iter::<Message>();
-    // println!("hello world3");
-
-    // Print the deserialized Vec<Message> for verification
-    // println!("Deserialized messages: {:?}", messages);
-
     let stdin = io::stdin();
     let reader = stdin.lock();
     let buffer = io::BufReader::new(reader);
