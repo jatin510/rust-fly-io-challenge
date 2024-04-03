@@ -38,9 +38,12 @@ pub enum Payload {
         messages: Vec<u64>,
     },
     Topology {
-        topology: HashMap<String, Vec<u64>>,
+        topology: HashMap<String, Vec<String>>,
     },
     TopologyOk {},
+    InternalMessage {
+        new_message: u64,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
