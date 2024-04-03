@@ -6,7 +6,7 @@ use std::io::BufRead;
 mod protocol;
 use protocol::*;
 
-fn handle_message(msg: Message) -> Message {
+fn handle_message(msg: Message, messages: &mut Vec<u64>) -> Message {
     let reply = match msg.body.payload {
         Payload::Init {
             node_id: _,
@@ -43,6 +43,45 @@ fn handle_message(msg: Message) -> Message {
                 },
             };
         }
+        Payload::Broadcast { message } => {
+            messages.push(message);
+
+            return Message {
+                src: msg.dest,
+                dest: msg.src,
+                body: Body {
+                    msg_id: Some(1),
+                    in_reply_to: msg.body.msg_id,
+                    payload: Payload::BroadcastOk {},
+                },
+            };
+        }
+        Payload::Read {} => {
+            return Message {
+                src: msg.dest,
+                dest: msg.src,
+                body: Body {
+                    msg_id: Some(1),
+                    in_reply_to: msg.body.msg_id,
+                    payload: Payload::ReadOk {
+                        messages: messages.to_vec(),
+                    },
+                },
+            };
+        }
+        Payload::Topology { topology } => {
+            // todo!("Implement logic related to topology");
+
+            return Message {
+                src: msg.dest,
+                dest: msg.src,
+                body: Body {
+                    msg_id: Some(1),
+                    in_reply_to: msg.body.msg_id,
+                    payload: Payload::TopologyOk {},
+                },
+            };
+        }
         _ => Message {
             src: msg.dest,
             dest: msg.src,
@@ -62,11 +101,13 @@ fn main() -> Result<(), Error> {
     let reader = stdin.lock();
     let buffer = io::BufReader::new(reader);
 
+    let mut messages: Vec<u64> = Vec::new();
+
     for line in buffer.lines() {
         let line = line.expect("Failed to read line");
         let msg: Message = serde_json::from_str(&line).expect("Failed to parse message");
 
-        let output_message = handle_message(msg);
+        let output_message = handle_message(msg, &mut messages);
 
         let reply = serde_json::to_string(&output_message).expect("the message to be serializable");
         println!("{}", reply);
@@ -81,6 +122,8 @@ mod tests {
 
     #[test]
     fn handle_message_init() {
+        let mut messages: Vec<u64> = Vec::new();
+
         let init_msg = Message {
             src: "client1".to_string(),
             dest: "server1".to_string(),
@@ -94,7 +137,7 @@ mod tests {
             },
         };
 
-        let reply = handle_message(init_msg);
+        let reply = handle_message(init_msg, &mut messages);
         assert_eq!(reply.src, "server1");
         assert_eq!(reply.dest, "client1");
         // assert_matches!(reply.body.payload, Payload::InitOk {});
@@ -102,6 +145,8 @@ mod tests {
 
     #[test]
     fn handle_message_echo() {
+        let mut messages: Vec<u64> = Vec::new();
+
         let echo_msg = Message {
             src: "client2".to_string(),
             dest: "server2".to_string(),
@@ -114,7 +159,7 @@ mod tests {
             },
         };
 
-        let reply = handle_message(echo_msg);
+        let reply = handle_message(echo_msg, &mut messages);
         assert_eq!(reply.src, "server2");
         assert_eq!(reply.dest, "client2");
         if let Payload::EchoOk { echo } = reply.body.payload {
