@@ -1,4 +1,6 @@
 use std::io::{self, Error};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Duration;
 
 use rand::Rng;
 use std::io::BufRead;
@@ -144,7 +146,7 @@ fn print_and_flush(output_message: Message) {
     println!("{}", reply);
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> anyhow::Result<()> {
     let stdin = io::stdin();
     let reader = stdin.lock();
     let buffer = io::BufReader::new(reader);
@@ -152,6 +154,19 @@ fn main() -> Result<(), Error> {
     let mut messages: Vec<u64> = Vec::new();
     let mut this_node_id = String::new();
     let mut cluster_nodes = Vec::<String>::new();
+
+    let (msg_sender, msg_receiver): (Sender<Message>, Receiver<Message>) = channel();
+
+    let handler = std::thread::spawn(move || -> anyhow::Result<()> {
+        loop {
+            for msg in msg_receiver.iter().take(50) {
+                let serialized_output = serde_json::to_string(&msg)?;
+                println!("{}", serialized_output);
+            }
+            std::thread::sleep(Duration::from_millis(400));
+        }
+        Ok(())
+    });
 
     for line in buffer.lines() {
         let line = line.expect("Failed to read line");
@@ -227,7 +242,7 @@ fn main() -> Result<(), Error> {
                                 },
                             };
 
-                            print_and_flush(internal_message);
+                            msg_sender.send(internal_message)?;
                         }
                     }
 
@@ -291,6 +306,8 @@ fn main() -> Result<(), Error> {
         // let reply = serde_json::to_string(&output_message).expect("the message to be serializable");
         // println!("{}", reply);
     }
+
+    let _ = handler.join().unwrap();
 
     return Ok(());
 }
